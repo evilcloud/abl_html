@@ -1,9 +1,11 @@
 import pymongo
-import webbrowser
+
+# import webbrowser
 import pymongo
 import os
 import time
 import sys
+from flask import Flask
 
 
 def connect_mongo() -> pymongo.MongoClient:
@@ -37,37 +39,48 @@ def machines_info(mdata) -> dict:
     return data
 
 
-client = connect_mongo()
-mdb = client.Abel
-mdata = mdb.mining.find()
-data = machines_info(mdata)
+def main():
+    client = connect_mongo()
+    mdb = client.Abel
+    mdata = mdb.mining.find()
+    data = machines_info(mdata)
 
-total = data["total_balance"]
+    total = data["total_balance"]
+    return f"<p>Total balance:</p><p>{total}</p>"
 
-
-contents = """<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html>
-<head>
-<meta content="text/html; charset=ISO-8859-1"
-http-equiv="content-type">
-<title>Python Webbrowser</title>
-</head>
-<body>
-%s
-</body>
-</html>
-""" % (
-    total
-)
-
-filename = "webbrowser.html"
-
-
-def main(contents, filename):
-    output = open(filename, "w")
-    output.write(contents)
-    output.close()
+    contents = """<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+    <html>
+    <head>
+    <meta content="text/html; charset=ISO-8859-1"
+    http-equiv="content-type">
+    <title>Python Webbrowser</title>
+    </head>
+    <body>
+    %s
+    </body>
+    </html>
+    """ % (
+        total
+    )
+    return contents
 
 
-main(contents, filename)
-webbrowser.open(filename)
+app = Flask(__name__)
+
+
+@app.route("/")
+def hello_world():
+    return main()
+
+
+# filename = "webbrowser.html"
+
+
+# def main(contents, filename):
+#     output = open(filename, "w")
+#     output.write(contents)
+#     output.close()
+
+
+# main(contents, filename)
+# webbrowser.open(filename)
