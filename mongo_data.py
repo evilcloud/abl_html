@@ -6,6 +6,27 @@ import pymongo
 import pandas as pd
 
 
+def load_file(filename):
+    if os.path.exists(filename):
+        with open(filename, "r") as f:
+            lines = f.readlines()
+    return [x.strip() for x in lines]
+
+
+def load_lost_machines():
+    lost_machines = []
+    lost_machines_file = "lost_machines.txt"
+    lost_machines = load_file(lost_machines_file)
+    return lost_machines
+
+
+def load_safe_machines():
+    safe_machines = []
+    safe_machines_file = "safe_machines.txt"
+    safe_machines = load_file(safe_machines_file)
+    return safe_machines
+
+
 def connect_mongodb():
     mongo_uri = os.environ.get("MONGO", None)
     if not mongo_uri:
@@ -27,30 +48,38 @@ def get_mongo_data():
 def data_to_walletworkers(data):
     wallets = []
     workers = []
+    found_machines = []
+    unsafe_machines = []
+    lost_machines = load_lost_machines()
+    safe_machines = load_safe_machines()
     for item in data:
+        machine = item["_id"]
         current_time = datetime.datetime.utcnow()
         last_update = item.get("update_time", None)
         timedelta = (
             humanize.naturaldelta(current_time - last_update) if last_update else ""
         )
+        # block_height = str(item.get("block_height", " "))
+        version = item.get("version", " ")
         is_worker = item.get("cluster", None)
+        entry = {
+            "Machine": machine,
+            "Balance": item["total_balance"],
+            "Programmatic": item.get("programmatic"),
+            "Since last update": str(timedelta),
+            "Version": version,
+        }
         if is_worker or is_worker == None:
-            workers.append(
-                {
-                    "Machine": item["_id"],
-                    "Since last update": str(timedelta),
-                }
-            )
+            workers.append(entry)
         else:
-            wallets.append(
-                {
-                    "Machine": item["_id"],
-                    "Balance": item["total_balance"],
-                    "Programmatic": item["programmatic"],
-                    "Since last update": str(timedelta),
-                }
-            )
-    return wallets, workers
+            if machine in safe_machines:
+                wallets.append(entry)
+            else:
+                unsafe_machines.append(entry)
+        if machine in lost_machines and item["programmatic"]:
+            found_machines.append(machine)
+
+    return wallets
 
 
 def total_machines(*args):
@@ -63,10 +92,9 @@ def total_machines(*args):
 
 def get_df_wallet_workers():
     data = get_mongo_data()
-    wallets, workers = data_to_walletworkers(data)
+    wallets = data_to_walletworkers(data)
     df_wallets = pd.DataFrame(wallets)
-    df_workers = pd.DataFrame(workers)
-    return df_wallets, df_workers
+    return df_wallets
 
 
 def get_wallets_total():
@@ -79,11 +107,6 @@ def get_wallets_nr():
     return total_machines(df_wallets)
 
 
-def get_workers_nr():
-    _, df_workers = get_df_wallet_workers()
-    return total_machines(df_workers)
-
-
-def get_total_machines():
-    df_wallets, df_workers = get_df_wallet_workers()
-    return total_machines(df_wallets, df_workers)
+# def get_total_machines():
+#     df_wallets = get_df_wallet_workers()
+#     return total_machines(df_wallets, df_workers)
